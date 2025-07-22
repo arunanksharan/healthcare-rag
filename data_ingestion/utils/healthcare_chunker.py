@@ -744,6 +744,19 @@ class HealthcareChunker:
         # Extract medical entities
         medical_entities, entity_types = self._extract_medical_entities(clean_text)
         
+        # Group entities by type for search compatibility
+        drugs = []
+        diseases = []
+        procedures = []
+        
+        for entity, entity_type in zip(medical_entities, entity_types):
+            if entity_type == "drug":
+                drugs.append(entity)
+            elif entity_type == "disease":
+                diseases.append(entity)
+            elif entity_type == "procedure":
+                procedures.append(entity)
+        
         # Classify content purpose
         answer_types = self._classify_content_purpose(clean_text)
         
@@ -761,9 +774,13 @@ class HealthcareChunker:
             "page_height": page_height_final,
             # New metadata for query processing
             "answer_types": answer_types,
-            "medical_entities": medical_entities,
-            "entity_types": list(set(entity_types)),  # Unique entity types
+            "medical_entities": medical_entities,  # Keep for backward compatibility
+            "entity_types": list(set(entity_types)),  # Keep for backward compatibility
             "has_medical_content": len(medical_entities) > 0,
+            # Add separate lists for search compatibility
+            "drugs": drugs,
+            "diseases": diseases,
+            "procedures": procedures,
         }
         
         if bbox:

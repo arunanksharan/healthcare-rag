@@ -72,15 +72,19 @@ def store_embeddings_in_qdrant(
     for i, (chunk_data, emb) in enumerate(zip(chunks, embeddings, strict=False)):
         try:
             # Validate chunk_data structure
-            if (
-                not isinstance(chunk_data, dict)
-                or not all(key in chunk_data for key in ["chunk", "page", "bbox"])
-                or not isinstance(chunk_data["bbox"], dict)
-            ):
+            if not isinstance(chunk_data, dict) or "chunk" not in chunk_data:
                 logger.warning(
                     f"Skipping invalid chunk data at index {i} for collection '{collection_name}': {chunk_data}"
                 )
                 continue
+            
+            # bbox is optional, but if present must be dict
+            bbox = chunk_data.get("bbox")
+            if bbox is not None and not isinstance(bbox, dict):
+                logger.warning(
+                    f"Invalid bbox at index {i}, setting to None: {bbox}"
+                )
+                bbox = None
 
             text_content = chunk_data.get("chunk", "").strip()
             if not text_content:
@@ -91,11 +95,21 @@ def store_embeddings_in_qdrant(
 
             payload = {
                 "text": text_content,
-                "page": chunk_data.get("page"),
-                "bbox": chunk_data.get("bbox"),
+                "page": chunk_data.get("page", 0),
+                "bbox": bbox,  # Use validated bbox
                 "parse_type": chunk_data.get("parse_type"),
                 "page_width": chunk_data.get("page_width"),
                 "page_height": chunk_data.get("page_height"),
+                # Add chunk-specific metadata for retrieval
+                "chunk_type": chunk_data.get("chunk_type"),
+                "answer_types": chunk_data.get("answer_types", []),
+                "drugs": chunk_data.get("drugs", []),
+                "diseases": chunk_data.get("diseases", []),
+                "procedures": chunk_data.get("procedures", []),
+                "boost_section": chunk_data.get("boost_section"),
+                "section_title": chunk_data.get("section_title"),
+                "section_type": chunk_data.get("section_type"),
+                "has_medical_content": chunk_data.get("has_medical_content", False),
                 **metadata,  # Spread the original metadata
                 "embedding_type": embedding_type.value,  # Store embedding type in metadata
             }

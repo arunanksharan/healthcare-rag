@@ -50,43 +50,43 @@ class QueryEnhancer:
         # Intent to search configuration mapping
         self.intent_configs = {
             QueryIntent.DOSAGE: {
-                "answer_types": ["dosage_info", "medication_info", "dosage"],
+                "answer_types": ["dosage", "definition"],  # Match chunker output
                 "boost_sections": ["dosage", "dosage_administration", "administration"],
                 "entity_types": ["drug", "dosage"],
                 "boost_weight": 1.3
             },
             QueryIntent.SIDE_EFFECTS: {
-                "answer_types": ["side_effects", "adverse_reactions"],
+                "answer_types": ["side_effects"],  # Match chunker output
                 "boost_sections": ["adverse_reactions", "side_effects", "warnings"],
                 "entity_types": ["drug", "symptom"],
                 "boost_weight": 1.3
             },
             QueryIntent.CONTRAINDICATIONS: {
-                "answer_types": ["contraindications", "warnings"],
+                "answer_types": ["contraindications"],  # Match chunker output
                 "boost_sections": ["contraindications", "warnings", "precautions"],
                 "entity_types": ["drug", "disease"],
                 "boost_weight": 1.3
             },
             QueryIntent.DIAGNOSIS: {
-                "answer_types": ["disease_info", "diagnosis", "symptoms"],
+                "answer_types": ["diagnosis", "definition"],  # Match chunker output
                 "boost_sections": ["diagnosis", "clinical_features", "symptoms"],
                 "entity_types": ["disease", "symptom"],
                 "boost_weight": 1.2
             },
             QueryIntent.TREATMENT: {
-                "answer_types": ["treatment", "therapy", "management"],
+                "answer_types": ["treatment"],  # Match chunker output
                 "boost_sections": ["treatment", "management", "therapy", "guidelines"],
                 "entity_types": ["disease", "drug", "procedure"],
                 "boost_weight": 1.2
             },
             QueryIntent.COMPARISON: {
-                "answer_types": ["comparison", "versus"],
+                "answer_types": ["comparison"],  # Match chunker output
                 "boost_sections": ["comparison", "differences"],
                 "entity_types": ["drug", "disease"],
                 "boost_weight": 1.2
             },
             QueryIntent.PROCEDURE: {
-                "answer_types": ["procedure_info", "technique"],
+                "answer_types": ["procedure"],  # Match chunker output
                 "boost_sections": ["procedure", "technique", "method"],
                 "entity_types": ["procedure"],
                 "boost_weight": 1.2
@@ -153,6 +153,10 @@ class QueryEnhancer:
         relevant_entity_types = intent_config.get("entity_types", [])
         
         for entity_type in relevant_entity_types:
+            # Only add filters for entity types we actually extract and store
+            if entity_type not in ["drug", "disease", "procedure"]:
+                continue
+                
             if entity_type in entities_by_type:
                 # Use normalized forms if available
                 entities = entities_by_type[entity_type]
@@ -183,11 +187,9 @@ class QueryEnhancer:
             "answer_types": intent_config.get("answer_types", [])
         }
         
-        # Add chunk_types based on answer_types for filtering
-        if intent_config.get("answer_types"):
-            # Map answer_types to chunk_types if needed
-            # For now, use answer_types as chunk_types
-            boost_params["chunk_types"] = intent_config["answer_types"]
+        # Don't add chunk_types - it's a different concept from answer_types
+        # chunk_type is the structural type (text, table, etc.)
+        # answer_types is what questions it can answer
         
         return boost_params
     

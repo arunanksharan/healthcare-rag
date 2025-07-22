@@ -31,5 +31,4 @@ class DocumentParser(BaseParser):
                 return result.model_dump()
             except Exception as e:
                 logger.error(f"[DocumentParser] fallback parse error for {original_filename}: {e}")
-
-            return {}
+                raise ValueError(f"Failed to parse document {original_filename} with both parsers") from e

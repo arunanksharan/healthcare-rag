@@ -421,21 +421,24 @@ class EnhancedHealthcareChunker:
         entity_types = {e.entity_type for e in entities}
         
         if NEREntityType.DRUG in entity_types:
-            answer_types.add("medication_info")
+            answer_types.add("definition")  # Drug info often includes definitions
         if NEREntityType.DISEASE in entity_types:
-            answer_types.add("disease_info")
+            answer_types.add("diagnosis")
+            answer_types.add("definition")
         if NEREntityType.PROCEDURE in entity_types:
-            answer_types.add("procedure_info")
+            answer_types.add("procedure")
         if NEREntityType.DOSAGE in entity_types or NEREntityType.FREQUENCY in entity_types:
-            answer_types.add("dosage_info")
+            answer_types.add("dosage")
         
         # Section-based classification
         if section and section.section_type:
             section_to_answer = {
                 "contraindications": "contraindications",
                 "adverse_reactions": "side_effects",
-                "dosage": "dosage_info",
+                "dosage": "dosage",
                 "diagnosis": "diagnosis",
+                "treatment": "treatment",
+                "prevention": "prevention",
             }
             if section.section_type in section_to_answer:
                 answer_types.add(section_to_answer[section.section_type])
@@ -443,16 +446,75 @@ class EnhancedHealthcareChunker:
         return list(answer_types) if answer_types else ["general"]
     
     def _classify_content_purpose(self, text: str) -> List[str]:
-        """Basic content classification without NER."""
+        """Basic content classification without NER - match regular chunker."""
         answer_types = []
         text_lower = text.lower()
         
-        if any(word in text_lower for word in ["dose", "dosage", "mg", "ml"]):
-            answer_types.append("dosage_info")
-        if any(word in text_lower for word in ["side effect", "adverse", "reaction"]):
+        # Definition patterns
+        if any(pattern in text_lower for pattern in [
+            "is a", "refers to", "defined as", "means", "definition",
+            "also known as", "abbreviated as"
+        ]):
+            answer_types.append("definition")
+        
+        # Dosage patterns
+        if any(pattern in text_lower for pattern in [
+            "dose", "dosage", "dosing", "mg", "mcg", "ml", "units",
+            "administration", "frequency", "daily", "twice", "three times",
+            "every", "hours", "bid", "tid", "qid", "prn"
+        ]):
+            answer_types.append("dosage")
+        
+        # Side effects patterns
+        if any(pattern in text_lower for pattern in [
+            "side effect", "adverse", "reaction", "complication",
+            "toxicity", "warning", "caution", "risk"
+        ]):
             answer_types.append("side_effects")
-        if any(word in text_lower for word in ["contraindication", "do not use"]):
+        
+        # Contraindications patterns
+        if any(pattern in text_lower for pattern in [
+            "contraindication", "do not use", "avoid", "interaction",
+            "should not", "must not", "incompatible", "allergy",
+            "hypersensitivity", "precaution"
+        ]):
             answer_types.append("contraindications")
+        
+        # Treatment patterns
+        if any(pattern in text_lower for pattern in [
+            "treatment", "therapy", "management", "protocol",
+            "guideline", "recommendation", "approach", "intervention"
+        ]):
+            answer_types.append("treatment")
+        
+        # Diagnosis patterns
+        if any(pattern in text_lower for pattern in [
+            "diagnosis", "diagnostic", "symptom", "sign", "test",
+            "screening", "examination", "finding", "presentation",
+            "criteria", "evaluation"
+        ]):
+            answer_types.append("diagnosis")
+        
+        # Procedure patterns
+        if any(pattern in text_lower for pattern in [
+            "procedure", "technique", "method", "step", "perform",
+            "operation", "surgical", "protocol for"
+        ]):
+            answer_types.append("procedure")
+        
+        # Prevention patterns
+        if any(pattern in text_lower for pattern in [
+            "prevent", "prevention", "prophylaxis", "reduce risk",
+            "avoid", "protective", "screening for prevention"
+        ]):
+            answer_types.append("prevention")
+        
+        # Comparison patterns
+        if any(pattern in text_lower for pattern in [
+            "versus", "vs", "compared to", "difference between",
+            "better than", "worse than", "alternative"
+        ]):
+            answer_types.append("comparison")
         
         return answer_types if answer_types else ["general"]
     
