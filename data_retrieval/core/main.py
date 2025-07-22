@@ -3,6 +3,7 @@ from fastapi import FastAPI
 
 from data_retrieval.app.api.retrieval_routes import router as retrieval_router
 from .settings import settings
+from shared.embeddings import EmbeddingType, EmbeddingRegistry
 
 # Configure logging at the application's entry point
 logging.basicConfig(
@@ -11,7 +12,23 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="Data Retrieval Service", version="1.0.0")
+
+
+@app.on_event("startup")
+async def startup_event():
+    """
+    FastAPI startup: preload default embedding model for faster first query.
+    """
+    try:
+        # Preload the default embedding model
+        logger.info("Preloading default embedding model...")
+        EmbeddingRegistry.get_instance().preload_models([EmbeddingType.get_default()])
+        logger.info(f"Default embedding model {EmbeddingType.get_default().value} preloaded")
+    except Exception as e:
+        logger.warning(f"Could not preload embedding model: {e}")
 
 
 @app.get("/retrieval/health", summary="Health Check", tags=["Health"])
