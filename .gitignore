@@ -1,0 +1,447 @@
+######################################################################
+# Python bytecode, compiled files and caches
+######################################################################
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.dylib
+*.dll
+
+######################################################################
+# Distribution / Packaging
+######################################################################
+# Although poetry.lock is typically committed for reproducible builds,
+# if you decide to ignore it in your project, uncomment the line below:
+# poetry.lock
+
+# Built distributions
+build/
+dist/
+*.egg-info/
+*.egg
+*.whl
+MANIFEST
+MANIFEST.in
+
+######################################################################
+# Virtual Environment directories
+######################################################################
+# Common virtual environment folders; adjust as needed.
+.env/
+venv/
+.venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+pyvenv.cfg
+
+######################################################################
+# Poetry Cache and artifacts
+######################################################################
+# If you have a poetry local cache directory or build artifacts,
+# add them here (typically located in ~/.cache/pypoetry); not project-specific.
+# For project-specific files, no action is generally needed.
+
+######################################################################
+# Celery logs and runtime files
+######################################################################
+# Celery may generate runtime files like process IDs or scheduler files.
+celerybeat.pid
+celerybeat-schedule
+celerybeat.db
+logs/
+*.log
+*.log.*
+
+######################################################################
+# Testing, Coverage and Caches
+######################################################################
+# Coverage and test results
+.coverage
+.coverage.*
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+pytest_cache/
+.pytest_cache/
+.tox/
+.nox/
+htmlcov/
+
+# MyPy static type checking cache
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+######################################################################
+# Jupyter Notebook checkpoints
+######################################################################
+.ipynb_checkpoints/
+*.ipynb
+
+######################################################################
+# Environment variable files (sensitive data)
+######################################################################
+# If you use a .env file to store environment variables, exclude it.
+.env
+.env.*
+.envrc
+.environment
+config.ini
+config.yaml
+config.yml
+secrets.yaml
+secrets.yml
+
+######################################################################
+# Editor and IDE configuration
+######################################################################
+# VSCode settings
+.vscode/
+*.code-workspace
+
+# PyCharm / IntelliJ IDEA settings
+.idea/
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+
+# Atom
+.atom/
+
+# Other editors and OS-specific files
+.spyderproject
+.spyproject
+.ropeproject
+
+######################################################################
+# Operating System files
+######################################################################
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+######################################################################
+# Temporary and backup files
+######################################################################
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+*.save
+tmp/
+temp/
+media/
+uploads/
+downloads/
+
+######################################################################
+# Machine Learning & AI specific
+######################################################################
+# Model files and checkpoints
+*.pkl
+*.pickle
+*.joblib
+*.h5
+*.hdf5
+*.pb
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+checkpoints/
+models/
+model_cache/
+model_outputs/
+runs/
+wandb/
+mlruns/
+.mlflow/
+tensorboard_logs/
+
+# Datasets and data files
+data/
+datasets/
+raw_data/
+processed_data/
+training_data/
+test_data/
+validation_data/
+*.csv
+*.tsv
+*.json
+*.jsonl
+*.parquet
+*.arrow
+*.feather
+*.h5
+*.hdf5
+*.npz
+*.npy
+
+# Vector databases and embeddings
+embeddings/
+vector_store/
+vector_db/
+faiss_index/
+chroma_db/
+pinecone_cache/
+weaviate_data/
+
+# Hugging Face cache
+.cache/
+transformers_cache/
+hf_cache/
+
+######################################################################
+# RAG & LLM specific
+######################################################################
+# Vector stores and indexes
+qdrant_storage/
+chroma/
+faiss/
+pinecone/
+weaviate/
+index/
+indexes/
+vector_index/
+
+# Document processing
+parsed_documents/
+chunked_documents/
+processed_docs/
+doc_html/
+doc_cache/
+text_cache/
+
+# LLM outputs and responses
+llm_outputs/
+responses/
+generated/
+chat_history/
+conversation_logs/
+
+######################################################################
+# FastAPI specific
+######################################################################
+# FastAPI generated files
+.pytest_cache/
+htmlcov/
+
+# Static files
+static/
+media/
+uploads/
+
+######################################################################
+# Database files
+######################################################################
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Redis
+dump.rdb
+appendonly.aof
+*.rdb
+
+# PostgreSQL
+*.sql
+
+######################################################################
+# Healthcare & Medical Data (HIPAA Compliance)
+######################################################################
+# Patient data and PHI (Protected Health Information)
+patient_data/
+phi/
+medical_records/
+health_data/
+clinical_data/
+*.hl7
+*.dicom
+*.dcm
+
+# Anonymized data (still sensitive)
+anonymized_data/
+de_identified/
+synthetic_data/
+
+######################################################################
+# API Keys and Secrets
+######################################################################
+# API keys and tokens
+*.key
+*.pem
+*.p12
+*.pfx
+.secrets
+secrets/
+api_keys/
+tokens/
+credentials/
+auth/
+
+# Cloud provider credentials
+.aws/
+.gcp/
+.azure/
+google-credentials.json
+aws-credentials.json
+service-account.json
+
+######################################################################
+# Docker and Containerization
+######################################################################
+# Docker
+.dockerignore
+Dockerfile.local
+docker-compose.override.yml
+docker-compose.local.yml
+.docker/
+
+# Kubernetes
+*.yaml.local
+*.yml.local
+local-deployment.yaml
+kustomization.yaml.local
+
+######################################################################
+# Monitoring and Observability
+######################################################################
+# Prometheus
+prometheus_data/
+
+# Grafana
+grafana_data/
+
+# Application logs
+logs/
+*.log
+*.log.*
+log/
+logging/
+
+######################################################################
+# Development and Build Tools
+######################################################################
+# Ruff
+.ruff_cache/
+
+# Black
+.black/
+
+# isort
+.isort.cfg
+
+# pre-commit
+.pre-commit-cache/
+
+# Node.js (if using any JS tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+######################################################################
+# Miscellaneous
+######################################################################
+# Backup files
+*~
+*.bak
+*.backup
+*.old
+*.orig
+*.save
+*.swp
+*.tmp
+
+# Archive files
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Compiled documentation
+docs/_build/
+docs/build/
+site/
+
+# Profiling data
+*.prof
+*.lprof
+*.pstats
+
+# Local configuration overrides
+local_settings.py
+local_config.py
+dev_settings.py
+test_settings.py
