@@ -7,23 +7,20 @@ from fastapi.responses import FileResponse
 from data_retrieval.app.api.models import SearchRequest
 from data_retrieval.utils.llm_generator import generate_llm_response
 from data_retrieval.utils.openai_embedding import (
-    get_openai_embedding,
     get_embedding_for_query,
     get_embeddings_for_multiple_types,
 )
-from data_retrieval.utils.query_enhancer import enhance_query
 from data_retrieval.utils.reranker import rerank_documents
 from data_retrieval.utils.search import (
-    search_with_metadata_and_embedding,
     search_multiple_collections,
     search_single_collection,
 )
 from shared.embeddings import EmbeddingType, get_collection_name
-from shared.query_analysis import EnhancedQueryProcessor
+from shared.query_analysis import QueryEnhancer
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-enhanced_processor = EnhancedQueryProcessor()
+query_enhancer = QueryEnhancer()
 
 
 @router.post("/search", summary="Search & generate LLM response with sequential citations")
@@ -32,35 +29,46 @@ async def search(request: SearchRequest):
         query = request.query
         embedding_types = request.embedding_types
         
-        # 1) Process query through enhanced analyzer
-        query_analysis = await run_in_threadpool(enhanced_processor.process_query, query)
+        # 1) Full query enhancement with NER and intent
+        enhanced_query_obj = await run_in_threadpool(query_enhancer.enhance_query, query)
         
         # Log analysis results
         logger.info(
-            f"Query intent: {query_analysis.primary_intent.value} "
-            f"(confidence: {query_analysis.intent_confidence:.2f})"
+            f"Query intent: {enhanced_query_obj.intent.value} "
+            f"(confidence: {enhanced_query_obj.intent_confidence:.2f})"
         )
         
-        # 2) Get enhanced query (may use LLM)
-        enhanced_query = await run_in_threadpool(enhance_query, query)
-
-        # 3) Determine which embedding types to search
+        # Log entities found
+        if enhanced_query_obj.entities:
+            entity_info = ", ".join([
+                f"{entity_type}: {entities}"
+                for entity_type, entities in enhanced_query_obj.entities.items()
+            ])
+            logger.info(f"Medical entities: {entity_info}")
+        
+        # 2) Get search strategy
+        search_strategy = query_enhancer.get_search_strategy(enhanced_query_obj)
+        
+        # 3) Use the primary enhanced query for embeddings
+        primary_query = enhanced_query_obj.cleaned_query
+        
+        # 4) Determine which embedding types to search
         if embedding_types is None:
-            # Use default or all types based on confidence
-            if query_analysis.intent_confidence > 0.7:
+            # Use default or multiple types based on confidence
+            if enhanced_query_obj.intent_confidence > 0.7:
                 # High confidence - use default medical embedding
                 embedding_types = [EmbeddingType.get_default()]
             else:
                 # Low confidence - search multiple types
                 embedding_types = [EmbeddingType.PUBMEDBERT, EmbeddingType.BIOBERT]
         
-        # 4) Perform intent-aware search
+        # 5) Perform enhanced search with entity filtering
         if len(embedding_types) == 1:
             # Single embedding type search
             embedding_type = embedding_types[0]
             query_vector = await run_in_threadpool(
                 get_embedding_for_query,
-                enhanced_query,
+                primary_query,
                 embedding_type
             )
             
@@ -68,30 +76,38 @@ async def search(request: SearchRequest):
             from data_retrieval.core.settings import settings
             collection_name = get_collection_name(settings.qdrant_collection_name, embedding_type)
             
-            # Search with intent filters
+            # Search with both intent and entity filters
             candidate_documents = await run_in_threadpool(
                 search_single_collection,
                 embedding=query_vector,
                 collection_name=collection_name,
                 metadata=None,
-                intent_filters=query_analysis.metadata_filters,
+                intent_filters=search_strategy["boost_params"],
+                entity_filters=search_strategy["filters"],
                 top_k=50
             )
         else:
             # Multiple embedding type search
             query_embeddings = await run_in_threadpool(
                 get_embeddings_for_multiple_types,
-                enhanced_query,
+                primary_query,
                 embedding_types
             )
             
-            # For multiple collections, apply filters per collection
-            # TODO: Enhance search_multiple_collections to support intent filters
-            candidate_documents = await run_in_threadpool(
-                search_multiple_collections,
-                query_embeddings=query_embeddings,
-                metadata=None,
-            )
+            # Check if we got any embeddings
+            if not query_embeddings:
+                logger.error(f"Failed to generate embeddings for any of the requested types: {[t.value for t in embedding_types]}")
+                candidate_documents = []
+            else:
+                # Search multiple collections with filters
+                candidate_documents = await run_in_threadpool(
+                    search_multiple_collections,
+                    query_embeddings=query_embeddings,
+                    metadata=None,
+                    intent_filters=search_strategy["boost_params"],
+                    entity_filters=search_strategy["filters"],
+                    top_k_per_collection=50
+                )
 
         llm_output_data: dict
 
@@ -101,52 +117,41 @@ async def search(request: SearchRequest):
                 "cited_source_documents": [],
             }
         else:
-            # 5) Rerank candidates - use enhanced queries for better reranking
-            # Pass multiple queries for more comprehensive reranking
-            rerank_queries = [enhanced_query]
-            if len(query_analysis.enhanced_queries) > 1:
-                rerank_queries.extend(query_analysis.enhanced_queries[1:3])  # Add 2 more variants
+            # 6) Rerank candidates using all query variants
+            rerank_query = " ".join(enhanced_query_obj.get_all_query_texts()[:3])
             
             ranked_documents = await run_in_threadpool(
                 rerank_documents, 
-                " ".join(rerank_queries),  # Combine for richer context
+                rerank_query,
                 candidate_documents, 
                 50
             )
 
-            # 6) Generate the final answer using LLM with intent context
-            # Add intent information to improve response generation
-            intent_context = (
-                f"Query Intent: {query_analysis.primary_intent.value}. "
-                f"Medical entities found: {', '.join([e.text for e in query_analysis.analysis.entities])}. "
-            )
-            
+            # 7) Generate the final answer using LLM with context
             llm_output_data = await run_in_threadpool(
                 generate_llm_response, 
-                enhanced_query,  # Keep original enhanced query for LLM
+                primary_query,
                 ranked_documents
             )
 
-        # Include information about which embedding types were searched
+        # Include comprehensive information in response
         searched_types = embedding_types if embedding_types else list(EmbeddingType)
         
         return {
             "message": "Search logic executed successfully.",
-            "enhanced_query": enhanced_query,
+            "enhanced_query": primary_query,
+            "query_variants": enhanced_query_obj.query_variants,
             "searched_embedding_types": [t.value for t in searched_types],
             "llm_response": llm_output_data.get("llm_answer_with_sequential_citations"),
             "referenced_contexts": llm_output_data.get(
                 "cited_source_documents"
             ),
             "query_analysis": {
-                "intent": query_analysis.primary_intent.value,
-                "confidence": query_analysis.intent_confidence,
-                "entities": [
-                    {"text": e.text, "type": e.entity_type.value}
-                    for e in query_analysis.analysis.entities
-                ],
-                "abbreviations_expanded": query_analysis.analysis.expanded_abbreviations,
-                "corrections_made": query_analysis.analysis.corrected_terms,
+                "intent": enhanced_query_obj.intent.value,
+                "confidence": enhanced_query_obj.intent_confidence,
+                "entities": enhanced_query_obj.entities,
+                "filters_applied": search_strategy["filters"],
+                "boost_params": search_strategy["boost_params"],
             }
         }
     except Exception as e:

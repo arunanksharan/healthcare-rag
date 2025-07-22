@@ -1,6 +1,6 @@
 import logging
 from sentence_transformers import CrossEncoder
-from typing import List, Dict
+from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -13,9 +13,9 @@ except Exception as e:
 
 def rerank_documents(
     query: str,
-    docs: List[Dict[str, any]],
+    docs: List[Dict[str, Any]],
     top_k: int = None
-) -> List[Dict[str, any]]:
+) -> List[Dict[str, Any]]:
     """
     Batch-scores and sorts docs by relevance to the query.
     Expects each doc to have a 'content' field.
