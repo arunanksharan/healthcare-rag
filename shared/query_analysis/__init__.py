@@ -16,6 +16,10 @@ from .enhanced_processor import (
     EnhancedQueryResult,
     EnhancedQueryProcessor
 )
+from .query_enhancer import (
+    QueryEnhancer,
+    EnhancedQuery
+)
 
 __all__ = [
     "QueryIntent",
@@ -27,4 +31,6 @@ __all__ = [
     "MedicalQueryAnalyzer",
     "EnhancedQueryResult",
     "EnhancedQueryProcessor",
+    "QueryEnhancer",
+    "EnhancedQuery",
 ]

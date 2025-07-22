@@ -67,7 +67,7 @@ def generate_llm_response(query: str, ranked_documents: list[dict[str, Any]]) ->
 
         # 3. Call the chat completion API
         response = client.chat.completions.create(
-            model="gpt-4.1",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": user_message},
