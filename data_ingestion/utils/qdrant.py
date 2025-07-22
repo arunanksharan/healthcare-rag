@@ -103,9 +103,10 @@ def store_embeddings_in_qdrant(
                 # Add chunk-specific metadata for retrieval
                 "chunk_type": chunk_data.get("chunk_type"),
                 "answer_types": chunk_data.get("answer_types", []),
-                "drugs": chunk_data.get("drugs", []),
-                "diseases": chunk_data.get("diseases", []),
-                "procedures": chunk_data.get("procedures", []),
+                # Lowercase all entity lists for consistent case-insensitive matching
+                "drugs": [drug.lower() for drug in chunk_data.get("drugs", [])],
+                "diseases": [disease.lower() for disease in chunk_data.get("diseases", [])],
+                "procedures": [procedure.lower() for procedure in chunk_data.get("procedures", [])],
                 "boost_section": chunk_data.get("boost_section"),
                 "section_title": chunk_data.get("section_title"),
                 "section_type": chunk_data.get("section_type"),

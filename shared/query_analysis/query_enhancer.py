@@ -9,6 +9,13 @@ from enum import Enum
 from .medical_analyzer import MedicalQueryAnalyzer, QueryAnalysisResult
 from .intent_detection import QueryIntent, detect_medical_intent
 
+# Import NER components for query analysis
+from shared.medical_ner import (
+    get_medical_ner_model,
+    MedicalEntityProcessor,
+    MedicalEntityType as NEREntityType,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -46,6 +53,12 @@ class QueryEnhancer:
     
     def __init__(self):
         self.medical_analyzer = MedicalQueryAnalyzer()
+        
+        # Initialize NER components for query analysis
+        self._ner_model = None
+        self._entity_processor = None
+        self._ner_initialized = False
+        self._init_ner_for_queries()
         
         # Intent to search configuration mapping
         self.intent_configs = {
@@ -99,6 +112,57 @@ class QueryEnhancer:
             }
         }
     
+    def _init_ner_for_queries(self):
+        """Initialize NER model for query analysis."""
+        try:
+            logger.info("Initializing BioBERT NER for query analysis...")
+            self._ner_model = get_medical_ner_model("biomedical-ner-all")
+            self._entity_processor = MedicalEntityProcessor()
+            self._ner_initialized = True
+            logger.info("BioBERT NER initialized successfully for query analysis")
+        except Exception as e:
+            logger.warning(f"Could not initialize NER for queries: {e}")
+            self._ner_initialized = False
+    
+    def _extract_entities_with_ner(self, text: str) -> Dict[str, List[str]]:
+        """Extract entities using BioBERT NER."""
+        if not self._ner_initialized or not self._ner_model:
+            return {}
+        
+        try:
+            # Extract entities using NER
+            ner_result = self._ner_model.extract_entities(text)
+            
+            # Process entities
+            if self._entity_processor:
+                ner_result = self._entity_processor.process_entities(ner_result)
+            
+            # Group by type
+            entities_by_type = {}
+            for entity in ner_result.entities:
+                entity_type = entity.entity_type.value
+                if entity_type not in entities_by_type:
+                    entities_by_type[entity_type] = []
+                
+                # Add both original and normalized forms (all lowercase for matching)
+                entities_by_type[entity_type].append(entity.text.lower())
+                if entity.normalized_form:
+                    entities_by_type[entity_type].append(entity.normalized_form.lower())
+                
+                # Add synonyms
+                for synonym in entity.synonyms:
+                    entities_by_type[entity_type].append(synonym.lower())
+            
+            # Remove duplicates
+            for entity_type in entities_by_type:
+                entities_by_type[entity_type] = list(set(entities_by_type[entity_type]))
+            
+            return entities_by_type
+            
+        except Exception as e:
+            logger.error(f"NER extraction failed for query: {e}")
+            return {}
+    
     def enhance_query(self, query: str) -> EnhancedQuery:
         """
         Enhance a medical query for optimal retrieval.
@@ -111,6 +175,33 @@ class QueryEnhancer:
         """
         # Step 1: Analyze query (NER, abbreviations, corrections)
         analysis = self.medical_analyzer.analyze_query(query)
+        
+        # Step 1b: Extract entities using BioBERT NER if available
+        ner_entities = self._extract_entities_with_ner(query)
+        
+        # Merge NER entities with pattern-based entities
+        if ner_entities:
+            logger.info(f"NER extracted entities: {ner_entities}")
+            for entity_type, entities in ner_entities.items():
+                if entity_type in ["drug", "disease", "procedure", "symptom"]:
+                    # Update analysis with NER entities
+                    existing = {e.text.lower() for e in analysis.entities if e.entity_type.value == entity_type}
+                    for ner_entity in entities:
+                        if ner_entity not in existing:
+                            # Add as MedicalEntity for compatibility
+                            from .medical_analyzer import MedicalEntity, MedicalEntityType
+                            try:
+                                entity_type_enum = MedicalEntityType(entity_type)
+                                analysis.entities.append(MedicalEntity(
+                                    text=ner_entity,
+                                    entity_type=entity_type_enum,
+                                    normalized_form=ner_entity,
+                                    confidence=0.9,
+                                    synonyms=[]
+                                ))
+                            except ValueError:
+                                # Skip if entity type not in enum
+                                logger.debug(f"Skipping entity type {entity_type} not in MedicalEntityType")
         
         # Step 2: Detect intent
         intent, confidence = detect_medical_intent(query, analysis)
