@@ -3,7 +3,7 @@ Medical query intent detection for healthcare RAG system.
 """
 import re
 from enum import Enum
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 from dataclasses import dataclass
 import logging
 
@@ -212,7 +212,7 @@ class MedicalIntentDetector:
             requires_specific_source=requires_specific_source
         )
     
-    def get_retrieval_strategy(self, intent: QueryIntent) -> Dict[str, any]:
+    def get_retrieval_strategy(self, intent: QueryIntent) -> Dict[str, Any]:
         """
         Get retrieval strategy parameters based on intent.
         
@@ -287,3 +287,20 @@ class MedicalIntentDetector:
         }
         
         return strategies.get(intent, strategies[QueryIntent.GENERAL])
+
+
+# Convenience function for backward compatibility
+def detect_medical_intent(query: str, analysis_result: Optional[Any] = None) -> Tuple[QueryIntent, float]:
+    """
+    Detect medical intent from a query.
+    
+    Args:
+        query: The query string
+        analysis_result: Optional query analysis result (not used currently)
+        
+    Returns:
+        Tuple of (intent, confidence)
+    """
+    detector = MedicalIntentDetector()
+    result = detector.detect_intent(query)
+    return result.primary_intent, result.confidence
