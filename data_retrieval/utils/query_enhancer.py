@@ -1,38 +1,120 @@
 import logging
 from datetime import date
+from typing import Dict, List, Optional
 from openai import OpenAI
 
 from ..core.settings import settings
+from shared.query_analysis import EnhancedQueryProcessor, QueryIntent
 
 logger = logging.getLogger(__name__)
 
 client = OpenAI(api_key=settings.openai_api_key)
+enhanced_processor = EnhancedQueryProcessor()
 
 
-def enhance_query(query: str) -> str:
+def enhance_query(query: str, use_llm_enhancement: bool = True) -> str:
     """
-    Rewrite the user's raw query into a concise, information-rich search query
-    optimized for government documents, policies, FAQs, and guidelines.
-    Returns ONLY the enhanced query. Falls back to the original query on any error.
+    Enhance the user's query using medical analysis and optionally LLM.
+    
+    Args:
+        query: Original user query
+        use_llm_enhancement: Whether to use LLM for additional enhancement
+        
+    Returns:
+        Enhanced query string
+    """
+    # First, use our medical query processor
+    try:
+        enhanced_result = enhanced_processor.process_query(query)
+        
+        # Log intent detection
+        logger.info(
+            f"Query intent: {enhanced_result.primary_intent.value} "
+            f"(confidence: {enhanced_result.intent_confidence:.2f})"
+        )
+        
+        # Log medical entities found
+        if enhanced_result.analysis.entities:
+            entity_info = ", ".join([
+                f"{e.text} ({e.entity_type.value})"
+                for e in enhanced_result.analysis.entities
+            ])
+            logger.info(f"Medical entities found: {entity_info}")
+        
+        # Use the best enhanced query
+        if enhanced_result.enhanced_queries:
+            base_enhanced_query = enhanced_result.enhanced_queries[0]
+        else:
+            base_enhanced_query = enhanced_result.analysis.cleaned_query
+        
+        # If high confidence in our analysis, skip LLM
+        if enhanced_result.intent_confidence > 0.8 and not use_llm_enhancement:
+            logger.info(f"High confidence medical query, using: '{base_enhanced_query}'")
+            return base_enhanced_query
+        
+        # For complex or low-confidence queries, use LLM for additional enhancement
+        if use_llm_enhancement:
+            return enhance_with_llm(
+                base_enhanced_query,
+                enhanced_result.primary_intent,
+                enhanced_result.analysis.entities
+            )
+        else:
+            return base_enhanced_query
+            
+    except Exception as e:
+        logger.error(f"Error in medical query enhancement: {e}", exc_info=True)
+        # Fall back to LLM enhancement
+        if use_llm_enhancement:
+            return enhance_with_llm(query, None, [])
+        else:
+            return query
+
+
+def enhance_with_llm(
+    query: str,
+    intent: Optional[QueryIntent] = None,
+    entities: Optional[List] = None
+) -> str:
+    """
+    Use LLM to further enhance the query with context about intent and entities.
     """
     system_prompt = (
         "You are an AI assistant specialized in understanding and processing queries related to "
-        "government documents, public policies, official guidelines, and frequently asked questions (FAQs). "
+        "medical and healthcare documents, clinical guidelines, drug information, and medical research. "
         "Your task is to refine user queries to be highly effective for retrieving these specific types of documents."
     )
+    
+    # Add intent context if available
+    intent_context = ""
+    if intent:
+        intent_context = f"\nThe query appears to be asking about: {intent.value}"
+        if intent == QueryIntent.DOSAGE:
+            intent_context += " - Focus on specific dosing information, administration routes, and schedules."
+        elif intent == QueryIntent.CONTRAINDICATIONS:
+            intent_context += " - Focus on warnings, drug interactions, and when not to use."
+        elif intent == QueryIntent.SIDE_EFFECTS:
+            intent_context += " - Focus on adverse reactions, complications, and safety information."
+    
+    # Add entity context if available
+    entity_context = ""
+    if entities:
+        entity_types = set(e.entity_type.value for e in entities)
+        entity_context = f"\nMedical entities identified: {', '.join(entity_types)}"
+    
     today_date = str(date.today())
-    user_prompt = f"""Please analyze the following user query, considering today's date is {today_date}.
-Your goal is to transform this query into an optimized search query suitable for retrieving relevant government documents, policies, FAQs, or guidelines.
+    user_prompt = f"""Please analyze the following medical query, considering today's date is {today_date}.{intent_context}{entity_context}
+Your goal is to transform this query into an optimized search query suitable for retrieving relevant medical documents, clinical guidelines, drug information, or research papers.
 
 Follow these steps carefully:
-1.  **Identify Key Entities and Concepts**: Extract the core subjects, organizations, programs, or topics mentioned in the query.
-2.  **Determine Document Intent**: Infer if the user is looking for a specific policy, a set of guidelines, answers to common questions (FAQ), or general information that might be contained in official documents.
-3.  **Incorporate Official Terminology**: If possible, replace colloquial terms with official or formal terminology commonly used in government and public sector documents (e.g., 'rules for new businesses' might become 'guidelines for new business registration' or 'policy on small business permits').
-4.  **Consider Temporal Aspects**: If the query implies a time frame (e.g., 'latest update', 'rules from last year', 'current policy'), incorporate this into the enhanced query. Use today's date ({today_date}) as a reference for terms like 'current' or 'recent'.
-5.  **Add Specificity**: If the query is broad, try to add specificity based on common structures of official documents. For example, if the query is 'environmental regulations', a possible enhancement could be 'environmental protection regulations and compliance guidelines'.
-6.  **Focus on Keywords**: The enhanced query should be a string of keywords and phrases that are likely to appear in the target documents. Avoid natural language questions or conversational phrases.
-7.  **Preserve Core Intent**: Ensure the enhanced query accurately reflects the user's original information need. Do not introduce new topics or significantly alter the scope.
-8.  **Conciseness**: Keep the enhanced query concise and to the point, while maximizing its information content for retrieval.
+1.  **Identify Key Medical Entities**: Extract diseases, drugs, procedures, symptoms, or anatomical terms.
+2.  **Determine Clinical Context**: Infer if the user needs diagnostic, therapeutic, pharmaceutical, or procedural information.
+3.  **Use Medical Terminology**: Replace lay terms with professional medical terminology when appropriate.
+4.  **Consider Current Guidelines**: For treatment or diagnostic queries, consider that guidelines may be updated annually.
+5.  **Add Specificity**: Include relevant medical context (e.g., "hypertension" → "hypertension management guidelines").
+6.  **Focus on Evidence**: For medical queries, prioritize evidence-based information and clinical guidelines.
+7.  **Preserve Critical Details**: Keep specific drug names, dosages, or medical conditions exactly as mentioned.
+8.  **Conciseness**: Create a focused search query that captures the medical information need.
 
 User Query: "{query}"
 

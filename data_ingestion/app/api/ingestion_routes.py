@@ -3,8 +3,9 @@ import shutil
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form
 
-from data_ingestion.app.api.models import NewDocumentMetadata, CustomDocumentType
+from data_ingestion.app.api.models import NewDocumentMetadata, CustomDocumentType, ChunkerType
 from data_ingestion.celery_worker.tasks import process_document_task
+from shared.embeddings import EmbeddingType
 
 logger = logging.getLogger(__name__)
 
@@ -22,18 +23,58 @@ async def ingest_document(
     title: str = Form(...),
     document_type: CustomDocumentType = Form(..., alias="type"),
     description: str = Form(...),
-    date: str = Form(...)
+    date: str = Form(...),
+    embedding_type: str = Form(default=None),
+    chunker_type: str = Form(default=None),
+    enable_ner: bool = Form(default=False)
 ):
     """
     API endpoint to receive a PDF file and its metadata, then queue for processing.
     Metadata fields (title, type, description, date) are passed as form fields.
+    
+    Args:
+        file: The PDF file to ingest
+        title: Document title
+        document_type: Type of document (GUIDELINE, POLICY, FAQ, DOCUMENT)
+        description: Document description
+        date: Document date
+        embedding_type: Optional embedding model to use
+        chunker_type: Optional chunking strategy to use
+        enable_ner: Enable NER-based entity extraction (default: False)
     """
     try:
+        # Validate and set embedding type
+        if embedding_type:
+            try:
+                embedding_type_enum = EmbeddingType(embedding_type)
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid embedding_type: {embedding_type}. Valid options: {[e.value for e in EmbeddingType]}"
+                )
+        else:
+            embedding_type_enum = EmbeddingType.get_default()
+        
+        # Validate and set chunker type
+        if chunker_type:
+            try:
+                chunker_type_enum = ChunkerType(chunker_type)
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid chunker_type: {chunker_type}. Valid options: {[e.value for e in ChunkerType]}"
+                )
+        else:
+            chunker_type_enum = ChunkerType.get_default()
+            
         metadata = NewDocumentMetadata(
             title=title,
             type=document_type,
             description=description,
-            date=date
+            date=date,
+            embedding_type=embedding_type_enum,
+            chunker_type=chunker_type_enum,
+            enable_ner=enable_ner
         )
 
         original_filename = file.filename

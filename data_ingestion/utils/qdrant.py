@@ -13,6 +13,7 @@ from qdrant_client.models import (
 )
 
 from ..core.settings import settings
+from shared.embeddings import EmbeddingType, EMBEDDING_CONFIGS, get_collection_name
 
 logger = logging.getLogger(__name__)
 
@@ -23,22 +24,29 @@ except Exception as e:
     raise e
 
 
-def init_qdrant_collection(collection_name: str):
+def init_qdrant_collection(collection_name: str, embedding_type: EmbeddingType):
     """
-    Create the collection (idempotent).
+    Create the collection with appropriate dimensions for the embedding type.
     """
     try:
+        # Get the actual collection name (with embedding type suffix)
+        actual_collection_name = get_collection_name(collection_name, embedding_type)
+        
+        # Get embedding dimensions from config
+        embedding_config = EMBEDDING_CONFIGS[embedding_type]
+        vector_size = embedding_config.embedding_dim
+        
         names = [c.name for c in client.get_collections().collections]
-        if collection_name not in names:
+        if actual_collection_name not in names:
             client.create_collection(
-                collection_name=collection_name,
-                vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
+                collection_name=actual_collection_name,
+                vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
             )
-            logger.info(f"Qdrant: created collection {collection_name} using provided client.")
+            logger.info(f"Qdrant: created collection {actual_collection_name} with vector size {vector_size}")
         else:
-            logger.debug(f"Qdrant: collection {collection_name} already exists.")
+            logger.debug(f"Qdrant: collection {actual_collection_name} already exists.")
     except Exception as e:
-        logger.error(f"Failed to init Qdrant collection {collection_name}: {e}")
+        logger.error(f"Failed to init Qdrant collection {actual_collection_name}: {e}")
         raise
 
 
@@ -46,6 +54,7 @@ def store_embeddings_in_qdrant(
     chunks: list,
     embeddings: list,
     metadata: dict,
+    embedding_type: EmbeddingType,
     collection_name: str = settings.qdrant_collection_name,
 ):
     """
@@ -88,6 +97,7 @@ def store_embeddings_in_qdrant(
                 "page_width": chunk_data.get("page_width"),
                 "page_height": chunk_data.get("page_height"),
                 **metadata,  # Spread the original metadata
+                "embedding_type": embedding_type.value,  # Store embedding type in metadata
             }
             points.append(PointStruct(id=str(uuid4()), vector=emb, payload=payload))
 
@@ -102,8 +112,11 @@ def store_embeddings_in_qdrant(
         return
 
     try:
-        response = client.upsert(collection_name=collection_name, points=points)
-        logger.info(f"Upserted {len(points)} points into '{collection_name}'")
+        # Get the actual collection name (with embedding type suffix)
+        actual_collection_name = get_collection_name(collection_name, embedding_type)
+        
+        response = client.upsert(collection_name=actual_collection_name, points=points)
+        logger.info(f"Upserted {len(points)} points into '{actual_collection_name}'")
         return response
     except Exception as e:
         logger.error(f"Failed to upsert points into Qdrant: {e}")
@@ -112,6 +125,7 @@ def store_embeddings_in_qdrant(
 
 def chunk_exists_by_metadata(
     metadata_conditions: dict[str, Any],
+    embedding_type: EmbeddingType,
     collection_name: str = settings.qdrant_collection_name,
 ) -> bool:
     """
@@ -125,8 +139,16 @@ def chunk_exists_by_metadata(
     filters = Filter(must=must_conditions)
 
     try:
+        # Get the actual collection name (with embedding type suffix)
+        actual_collection_name = get_collection_name(collection_name, embedding_type)
+        
+        # Check if collection exists first
+        names = [c.name for c in client.get_collections().collections]
+        if actual_collection_name not in names:
+            return False
+            
         points, _ = client.scroll(
-            collection_name=collection_name,
+            collection_name=actual_collection_name,
             scroll_filter=filters,
             limit=1,
             with_payload=False,
