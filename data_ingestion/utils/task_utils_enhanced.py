@@ -1,11 +1,9 @@
 import logging
-from typing import Any
 
 from ..parsers.base_parser import BaseParser
 from ..parsers.document_parser import DocumentParser
 from .custom_chunker import CustomJsonChunker
 from .healthcare_chunker import HealthcareChunker
-from .enhanced_healthcare_chunker import EnhancedHealthcareChunker
 from shared.embeddings import EmbeddingType, get_embedding_model
 from data_ingestion.app.api.models import ChunkerType
 
@@ -36,7 +34,7 @@ def get_parser(doc_type: str) -> type[BaseParser]:
     return parser_cls
 
 
-def parse_document(content: bytes, metadata: dict[str, Any]) -> dict[str, Any]:
+def parse_document(content: bytes, metadata: dict[str, any]) -> dict[str, any]:
     """
     Parses the document content using the appropriate parser based on metadata.
 
@@ -66,7 +64,7 @@ def parse_document(content: bytes, metadata: dict[str, Any]) -> dict[str, Any]:
         raise
 
 
-def chunk_parsed_document(parsed_json: dict[str, Any], metadata: dict[str, Any]) -> list[dict[str, Any]]:
+def chunk_parsed_document(parsed_json: dict[str, any], metadata: dict[str, any]) -> list[dict[str, any]]:
     original_filename = metadata.get("original_filename")
     doc_type_original = metadata.get("type", "").lower().strip()
     parse_type = DOC_TYPE_TO_PARSE_TYPE_MAP.get(doc_type_original, "unknown")
@@ -86,14 +84,15 @@ def chunk_parsed_document(parsed_json: dict[str, Any], metadata: dict[str, Any])
     try:
         logger.info(f"Chunking parsed document for filename='{original_filename}' (parse_type='{parse_type}', chunker_type='{chunker_type.value}')...")
         
+        # Check if NER enrichment is requested
+        use_ner = metadata.get("enable_ner", False)
+        
         # Select appropriate chunker
         if chunker_type == ChunkerType.HEALTHCARE:
-            # Check if NER enrichment is requested
-            use_ner = metadata.get("enable_ner", False)
-            
             if use_ner:
                 # Use enhanced chunker with NER
                 logger.info(f"Using enhanced healthcare chunker with NER for '{original_filename}'")
+                from ..utils.enhanced_healthcare_chunker import EnhancedHealthcareChunker
                 chunker = EnhancedHealthcareChunker.get_instance()
                 # Initialize tokenizer if needed
                 if not hasattr(EnhancedHealthcareChunker, '_tokenizer_instance') or EnhancedHealthcareChunker._tokenizer_instance is None:
@@ -107,7 +106,7 @@ def chunk_parsed_document(parsed_json: dict[str, Any], metadata: dict[str, Any])
         else:
             chunker = CustomJsonChunker.get_instance()
             
-        chunks = chunker.chunk_json(parsed_json, metadata_with_parse_type)
+        chunks = chunker.chunk_json(parsed_json, metadata=metadata_with_parse_type)
         logger.info(f"Generated {len(chunks)} chunks using {chunker_type.value} chunker for filename='{original_filename}'")
         return chunks
     except Exception as e:
@@ -119,7 +118,7 @@ def chunk_parsed_document(parsed_json: dict[str, Any], metadata: dict[str, Any])
         raise
 
 
-def generate_embeddings(chunks: list[dict[str, Any]], embedding_type: EmbeddingType) -> list:
+def generate_embeddings(chunks: list[dict[str, any]], embedding_type: EmbeddingType) -> list:
     """
     Generate embeddings for chunks using the specified embedding model.
     

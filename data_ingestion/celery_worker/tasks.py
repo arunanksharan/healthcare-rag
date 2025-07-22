@@ -5,20 +5,26 @@ from celery.signals import worker_process_init
 from ..core.settings import settings
 
 # ──────────────────────────────────────────────────────────────────────────────
-# PRELOAD tokenizer & embedding model
+# PRELOAD tokenizers & embedding model
 from ..utils.custom_chunker import CustomJsonChunker
+from ..utils.healthcare_chunker import HealthcareChunker
+from ..utils.enhanced_healthcare_chunker import EnhancedHealthcareChunker
 from ..utils.qdrant import (
     chunk_exists_by_metadata,
     init_qdrant_collection,
     store_embeddings_in_qdrant,
 )
+from shared.embeddings import EmbeddingType
 from ..utils.task_utils import (
     chunk_parsed_document,
     generate_embeddings,
     parse_document,
 )
 
+# Initialize both chunkers
 CustomJsonChunker.init_tokenizer_for_worker()
+HealthcareChunker.init_tokenizer_for_worker()
+EnhancedHealthcareChunker.init_tokenizer_for_worker()
 # ──────────────────────────────────────────────────────────────────────────────
 
 logger = logging.getLogger(__name__)
@@ -50,11 +56,16 @@ app.conf.update(
 def on_worker_init(**kwargs):
     """
     Called once in each worker process after fork.
-    Only ensure Qdrant collection is ready here
+    Initialize collections for all embedding types.
     """
     try:
-        init_qdrant_collection(settings.qdrant_collection_name)
-        logger.info(f"Worker init: Qdrant '{settings.qdrant_collection_name}' ready")
+        # Initialize collections for all embedding types
+        for embedding_type in EmbeddingType:
+            try:
+                init_qdrant_collection(settings.qdrant_collection_name, embedding_type)
+                logger.info(f"Worker init: Qdrant collection for {embedding_type.value} ready")
+            except Exception as e:
+                logger.warning(f"Could not init collection for {embedding_type.value}: {e}")
     except Exception as e:
         logger.error(f"Worker init failed: {e}", exc_info=True)
 
@@ -84,6 +95,9 @@ def process_document_task(self, saved_file_path: str, metadata: dict, original_f
             logger.error(f"Failed to read file {saved_file_path} for {original_filename}: {e}", exc_info=True)
             raise
 
+        # Get embedding type from metadata
+        embedding_type = EmbeddingType(processing_metadata.get("embedding_type", EmbeddingType.get_default().value))
+        
         # STEP 1: Check if document is already parsed using new metadata fields
         uniqueness_criteria = {
             "title": processing_metadata.get("title"),
@@ -91,7 +105,7 @@ def process_document_task(self, saved_file_path: str, metadata: dict, original_f
             "date": processing_metadata.get("date"),
             "original_filename": original_filename,
         }
-        if chunk_exists_by_metadata(uniqueness_criteria):
+        if chunk_exists_by_metadata(uniqueness_criteria, embedding_type):
             logger.info(f"Document already processed based on metadata: {uniqueness_criteria}")
             return {
                 "status": "skipped",
@@ -114,23 +128,23 @@ def process_document_task(self, saved_file_path: str, metadata: dict, original_f
         logger.info(f"Successfully generated {len(chunks)} chunks for {original_filename}")
 
         # Step 4: Embeddings
-        logger.info(f"Generating embeddings for {len(chunks)} chunks from {original_filename}")
-        embeddings = generate_embeddings(chunks)
+        logger.info(f"Generating embeddings for {len(chunks)} chunks from {original_filename} using {embedding_type.value}")
+        embeddings = generate_embeddings(chunks, embedding_type)
         if not embeddings:
             raise ValueError(f"No embeddings generated for {original_filename!r}")
-        logger.info(f"Successfully generated {len(embeddings)} embeddings for {original_filename}")
+        logger.info(f"Successfully generated {len(embeddings)} embeddings for {original_filename} using {embedding_type.value}")
 
         # Step 5: Upsert
         logger.info(f"Storing {len(embeddings)} embeddings in Qdrant for {original_filename}")
         metadata_for_qdrant = processing_metadata.copy()
         metadata_for_qdrant["saved_file_path"] = saved_file_path # Add saved_file_path to Qdrant metadata
         
-        store_embeddings_in_qdrant(chunks, embeddings, metadata_for_qdrant)
+        store_embeddings_in_qdrant(chunks, embeddings, metadata_for_qdrant, embedding_type)
         logger.info(f"Successfully processed and stored {len(chunks)} chunks for {original_filename}")
 
         return {
             "status": "success",
-            "message": f"Processed {original_filename!r}, generated {len(chunks)} chunks and {len(embeddings)} embeddings.",
+            "message": f"Processed {original_filename!r}, generated {len(chunks)} chunks and {len(embeddings)} embeddings using {embedding_type.value}.",
             "filename": original_filename,
             "metadata_processed": processing_metadata # Return the metadata used for processing
         }
