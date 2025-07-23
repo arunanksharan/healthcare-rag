@@ -1,40 +1,63 @@
-version: '3.8'
+version: '3.9'
 
 services:
   qdrant:
-    image: qdrant/qdrant:latest
-    container_name: healthcare_rag_qdrant
+    image: qdrant/qdrant:latest # REST 6333, gRPC 6334
+    container_name: qdrant
+    restart: unless-stopped
     ports:
       - '6333:6333'
       - '6334:6334'
     volumes:
-      - ./qdrant_storage:/qdrant/storage
-    restart: always
+      - qdrant_data:/qdrant/storage
     environment:
-      - QDRANT__LOG_LEVEL=INFO
+      QDRANT__LOG_LEVEL: INFO # adjust as needed
+      # QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY}
+      # QDRANT__TELEMETRY_DISABLED: "true"
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:6333/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   redis:
     image: redis:7-alpine
-    container_name: healthcare_rag_redis
+    container_name: redis
+    restart: unless-stopped
     ports:
       - '6379:6379'
+    command: >
+      redis-server
+      --appendonly yes                 # durable AOF
+      --save 60 1 --save 300 10        # snapshots too
+      --loglevel warning
+      # --requirepass ${REDIS_PASSWORD}      # enable if needed
     volumes:
-      - ./redis_data:/data
-    restart: always
-    command: redis-server --appendonly yes
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Optional: Redis Commander for monitoring Redis
   redis-commander:
     image: rediscommander/redis-commander:latest
-    container_name: healthcare_rag_redis_commander
+    container_name: redis_commander
+    restart: unless-stopped
     ports:
       - '8081:8081'
     environment:
-      - REDIS_HOSTS=local:redis:6379
+      REDIS_HOSTS: local:redis:6379
+      # REDIS_HOSTS: local:redis:6379:0:${REDIS_PASSWORD}
     depends_on:
-      - redis
-    restart: always
+      redis:
+        condition: service_healthy
+    profiles: ['debug'] # run only with: docker compose --profile debug up
+
+networks:
+  default:
+    name: healthcare_rag # shared network
 
 volumes:
-  qdrant_storage:
+  qdrant_data:
   redis_data:
