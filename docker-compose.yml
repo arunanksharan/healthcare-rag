@@ -15,7 +15,7 @@ services:
       # QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY}
       # QDRANT__TELEMETRY_DISABLED: "true"
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:6333/health']
+      test: ['CMD', 'curl', '-f', 'http://localhost:6333/healthz']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -26,12 +26,20 @@ services:
     restart: unless-stopped
     ports:
       - '6379:6379'
-    command: >
-      redis-server
-      --appendonly yes                 # durable AOF
-      --save 60 1 --save 300 10        # snapshots too
-      --loglevel warning
-      # --requirepass ${REDIS_PASSWORD}      # enable if needed
+    # CORRECTED: The command is now a list, which is clearer and safer.
+    # The comments have been removed from the command itself.
+    command:
+      - 'redis-server'
+      - '--appendonly'
+      - 'yes'
+      - '--save'
+      - '60 1'
+      - '--save'
+      - '300 10'
+      - '--loglevel'
+      - 'warning'
+      # - "--requirepass"
+      # - "${REDIS_PASSWORD}"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -39,7 +47,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
   redis-commander:
     image: rediscommander/redis-commander:latest
     container_name: redis_commander
