@@ -242,14 +242,20 @@ validation_data/
 *.npz
 *.npy
 
-# Vector databases and embeddings
-embeddings/
+# Vector databases and embeddings (data files, not source code)
+# Note: This excludes embedding data files but allows shared/embeddings/ source code
+embedding_data/
+embedding_cache/
 vector_store/
 vector_db/
 faiss_index/
 chroma_db/
 pinecone_cache/
 weaviate_data/
+# Exclude embedding files in root or data directories, but not source code
+/embeddings/
+data/embeddings/
+cache/embeddings/
 
 # Hugging Face cache
 .cache/
