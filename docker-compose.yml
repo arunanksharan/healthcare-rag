@@ -15,7 +15,8 @@ services:
       # QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY}
       # QDRANT__TELEMETRY_DISABLED: "true"
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:6333/healthz']
+      test:
+        ['CMD', 'wget', '--quiet', '--spider', 'http://localhost:6333/healthz']
       interval: 30s
       timeout: 10s
       retries: 3
