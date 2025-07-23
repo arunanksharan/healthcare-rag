@@ -2,31 +2,31 @@
 name = "rag-demo"
 version = "0.1.0"
 description = "A data ingestion and data retrieval service using RAG"
-authors = ["Akshat Gupta <akshatb@kuzushilabs.xyz>"]
+authors = ["Arunank <arunank@kuzushilabs.xyz>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-fastapi = "^0.100.0"
-uvicorn = { extras = ["standard"], version = "^0.22.0" }
-celery = "^5.3.0"
-boto3 = "^1.26.0"
-redis = "^4.6.0"
-transformers = "^4.30.0"
+fastapi = "^0.112.0"  # Latest stable version (July 2025)
+uvicorn = { extras = ["standard"], version = "^0.35.0" }  # Latest stable version (June 2025)
+celery = "^5.5.3"  # Latest stable version (June 2025)
+boto3 = "^1.35.0"
+redis = "^6.2.0"  # Latest stable version (May 2025) - note: 6.x series, not 5.x
+transformers = "^4.53.0"  # Latest stable version
 openai = "^1.73.0"
-qdrant-client = "^1.13.3"
-sentence-transformers = "^4.1.0"
+qdrant-client = "^1.13.3"  # Latest version
+numpy = "^2.1.0"  # Required by qdrant-client 1.13.3+
+sentence-transformers = "^5.0.0"  # Latest stable version (July 2025)
 pydantic-settings = "^2.8.1"
 tokenizers = "^0.21.1"
-llama-index = "^0.12.33"
+llama-index = "^0.12.51"  # Latest stable version (July 2025)
 llama-parse = "^0.6.20"
 requests = "^2.32.3"
 ruff = "^0.11.12"
 watchtower = "3.4.0"
 pyyaml = "^6.0.2"
 python-multipart = "^0.0.20"
-torch = "^2.0.0"
-numpy = "^1.24.0"
+torch = "^2.5.0"  # Compatible with latest versions
 # NER dependencies
 rich = "^13.0.0"  # For pretty printing in test scripts
 

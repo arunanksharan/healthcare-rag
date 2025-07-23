@@ -259,7 +259,7 @@ class QueryEnhancer:
                             all_forms.add(entity.text.lower())
                             if entity.normalized_form:
                                 all_forms.add(entity.normalized_form.lower())
-                            all_forms.update(entity.synonyms)
+                            all_forms.update([s.lower() for s in entity.synonyms])
                     
                     if all_forms:
                         filters[f"{entity_type}s"] = list(all_forms)  # pluralize for field name

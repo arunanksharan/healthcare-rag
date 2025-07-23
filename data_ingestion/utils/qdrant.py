@@ -104,9 +104,9 @@ def store_embeddings_in_qdrant(
                 "chunk_type": chunk_data.get("chunk_type"),
                 "answer_types": chunk_data.get("answer_types", []),
                 # Lowercase all entity lists for consistent case-insensitive matching
-                "drugs": [drug.lower() for drug in chunk_data.get("drugs", [])],
-                "diseases": [disease.lower() for disease in chunk_data.get("diseases", [])],
-                "procedures": [procedure.lower() for procedure in chunk_data.get("procedures", [])],
+                "drugs": [drug.lower() for drug in (chunk_data.get("drugs") or [])],
+                "diseases": [disease.lower() for disease in (chunk_data.get("diseases") or [])],
+                "procedures": [procedure.lower() for procedure in (chunk_data.get("procedures") or [])],
                 "boost_section": chunk_data.get("boost_section"),
                 "section_title": chunk_data.get("section_title"),
                 "section_type": chunk_data.get("section_type"),
