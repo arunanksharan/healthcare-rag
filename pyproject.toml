@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "A data ingestion and data retrieval service using RAG"
 authors = ["Arunank <arunank@kuzushilabs.xyz>"]
 readme = "README.md"
+packages = [{include = "shared"}, {include = "data_ingestion"}, {include = "data_retrieval"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"

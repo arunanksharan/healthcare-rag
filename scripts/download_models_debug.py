@@ -6,19 +6,47 @@ This ensures models are cached locally before running the services.
 import os
 import sys
 from pathlib import Path
-
-# Add project root to path - more robust approach
-project_root = Path(__file__).parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
-
-# Also add the shared directory explicitly
-shared_path = project_root / "shared"
-if str(shared_path.parent) not in sys.path:
-    sys.path.insert(0, str(shared_path.parent))
-
-from shared.embeddings import EmbeddingType, get_embedding_model
 import logging
+
+# Add project root to path - handle different execution contexts
+current_file = Path(__file__).resolve()
+project_root = current_file.parent.parent
+sys.path.insert(0, str(project_root))
+
+# Debug path information
+print(f"Current file: {current_file}")
+print(f"Project root: {project_root}")
+print(f"Python path: {sys.path[:3]}...")  # Show first 3 paths
+print(f"Working directory: {os.getcwd()}")
+
+try:
+    from shared.embeddings import EmbeddingType, get_embedding_model
+except ImportError as e:
+    print(f"\nError importing shared.embeddings: {e}")
+    print("\nTrying alternative import methods...")
+    
+    # Try to import from different paths
+    possible_paths = [
+        project_root,
+        Path.cwd(),
+        Path.cwd().parent,
+        Path("/root/healthcare-rag"),
+    ]
+    
+    for path in possible_paths:
+        if path.exists() and (path / "shared" / "embeddings.py").exists():
+            sys.path.insert(0, str(path))
+            try:
+                from shared.embeddings import EmbeddingType, get_embedding_model
+                print(f"Successfully imported from: {path}")
+                break
+            except ImportError:
+                continue
+    else:
+        print("\nCould not find shared.embeddings module!")
+        print("Please ensure you're running from the project root directory")
+        print("and that the shared/embeddings.py file exists.")
+        sys.exit(1)
 
 logging.basicConfig(
     level=logging.INFO,
