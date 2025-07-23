@@ -2,7 +2,9 @@ version: '3.9'
 
 services:
   qdrant:
-    image: qdrant/qdrant:latest # REST 6333, gRPC 6334
+    build:
+      context: . # The build context is the current directory (where docker-compose.yml is)
+      dockerfile: dockerfiles/qdrant.dockerfile # The path to your specific dockerfile
     container_name: qdrant
     restart: unless-stopped
     ports:
@@ -15,8 +17,7 @@ services:
       # QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY}
       # QDRANT__TELEMETRY_DISABLED: "true"
     healthcheck:
-      test:
-        ['CMD', 'wget', '--quiet', '--spider', 'http://localhost:6333/healthz']
+      test: ['CMD', 'curl', '-f', 'http://localhost:6333/healthz']
       interval: 30s
       timeout: 10s
       retries: 3
